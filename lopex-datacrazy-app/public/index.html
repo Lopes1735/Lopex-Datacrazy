@@ -20,12 +20,12 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><div><h1>Lopes • DataCrazy</h1><div class="sub">Coleta • origem Meta/Google • histórico • validação • rodízio</div></div><div id="serverBadge" class="pill">carregando configuração...</div></div>
+  <div class="top"><div><h1>Lopes • DataCrazy</h1><div class="sub">V11 • origem Meta/Google • histórico • validação • rodízio</div></div><div id="serverBadge" class="pill">carregando configuração...</div></div>
 
   <div class="card auth">
     <input id="appPassword" type="password" placeholder="Senha do painel (se configurada)" />
     <input id="token" type="password" placeholder="Chave API DataCrazy" />
-    <button id="collectBtn">COLETAR AGORA</button>
+    <button id="collectBtn">EXECUTAR V11</button>
     <button class="secondary" id="clearBtn">Limpar tela</button>
     <span class="muted small">A chave digitada fica apenas nesta aba e é enviada por HTTPS ao servidor.</span>
   </div>
@@ -49,12 +49,13 @@
       <button class="secondary" id="markAll">Marcar visíveis</button>
       <button class="secondary" id="unmarkAll">Desmarcar visíveis</button>
       <span class="grow"></span>
-      <button class="green" id="xlsxBtn" disabled>BAIXAR EXCEL</button>
+      <button class="green" id="v11XlsxBtn" disabled>BAIXAR EXCEL V11</button>
+      <button class="secondary" id="xlsxBtn" disabled>Excel da tela</button>
       <button class="yellow" id="roundBtn" disabled>GERAR RODÍZIO</button>
     </div>
     <div class="table-wrap"><table><thead><tr>
       <th>Rodízio</th><th>Nome</th><th>Telefone</th><th>Origem</th><th>Fonte/Campanha</th><th>Regional</th><th>Validação origem</th><th>Status</th><th>Situação</th><th>Departamento</th><th>Atualizado</th><th>Ações</th>
-    </tr></thead><tbody id="tbody"><tr><td colspan="12" class="muted">Clique em COLETAR AGORA.</td></tr></tbody></table></div>
+    </tr></thead><tbody id="tbody"><tr><td colspan="12" class="muted">Clique em EXECUTAR V11.</td></tr></tbody></table></div>
   </div>
   <div id="sources" class="footer-note"></div>
 </div>
@@ -81,14 +82,24 @@ function render(){
   tb.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>window.open('https://wa.me/'+String(b.dataset.wa).replace(/\D/g,''),'_blank'));
   updateSelected();
 }
-function updateSelected(){$('kSelected').textContent=state.selected.size;$('roundBtn').disabled=!state.selected.size;$('xlsxBtn').disabled=!state.rows.length}
+function updateSelected(){$('kSelected').textContent=state.selected.size;$('roundBtn').disabled=!state.selected.size;$('xlsxBtn').disabled=!state.rows.length;$('v11XlsxBtn').disabled=!(state.jobId&&state.rows.length)}
 function updateKpis(s={}){$('kTotal').textContent=s.totalSemAtendente||0;$('kNormal').textContent=s.semAtendenteNaoFailed||0;$('kFailed').textContent=s.failedSemAtendente||0;$('kOrigin').textContent=s.origemConfirmada||0;$('kConflict').textContent=s.origemConflito||0}
 async function init(){state.config=await fetch('/api/config').then(r=>r.json());$('serverBadge').textContent=`Painel ${state.config.appPasswordConfigured?'protegido':'sem senha'} • Token ${state.config.dataCrazyTokenConfigured?'no servidor':'manual'}`;if(state.config.dataCrazyTokenConfigured){$('token').placeholder='Token já configurado no servidor (opcional)'}if(!state.config.appPasswordConfigured)$('appPassword').style.display='none'}
-async function startCollect(){state.token=$('token').value.trim();state.password=$('appPassword').value; if(!state.config.dataCrazyTokenConfigured&&!state.token)return alert('Cole a chave API do DataCrazy.');$('collectBtn').disabled=true;$('statusCard').style.display='flex';$('statusText').textContent='Iniciando coleta...';$('progress').style.width='2%';$('progressText').textContent='2%';try{const r=await api('/api/collect/start',{method:'POST',body:'{}'});state.jobId=r.jobId;pollJob()}catch(e){$('collectBtn').disabled=false;alert(e.message)}}
+async function startCollect(){state.token=$('token').value.trim();state.password=$('appPassword').value; if(!state.config.dataCrazyTokenConfigured&&!state.token)return alert('Cole a chave API do DataCrazy.');$('collectBtn').disabled=true;$('v11XlsxBtn').disabled=true;$('statusCard').style.display='flex';$('statusText').textContent='V11: iniciando coleta...';$('progress').style.width='2%';$('progressText').textContent='2%';try{const r=await api('/api/collect/start',{method:'POST',body:'{}'});state.jobId=r.jobId;pollJob()}catch(e){$('collectBtn').disabled=false;alert(e.message)}}
 async function pollJob(){try{const j=await api('/api/jobs/'+state.jobId);$('statusText').textContent=j.message||j.phase;$('progress').style.width=(j.progress||0)+'%';$('progressText').textContent=(j.progress||0)+'%';if(j.status==='done'){state.rows=j.result.rows||[];state.selected=new Set(state.rows.map(r=>r.ConversationId));updateKpis(j.result.summary);const regs=[...new Set(state.rows.map(r=>r.Regional).filter(Boolean))].sort();$('regionalFilter').innerHTML='<option value="">Todas as regionais</option>'+regs.map(x=>`<option>${esc(x)}</option>`).join('');$('sources').innerHTML='<strong>Fontes de origem:</strong> <span class="source-list">'+(j.result.sourceStatus||[]).map(s=>`<span class="pill ${s.status==='OK'?'ok':'no'}">${esc(s.fonte)}: ${esc(s.status)}${s.telefones?` (${s.telefones})`:''}</span>`).join('')+'</span>';render();$('collectBtn').disabled=false;return}if(j.status==='error'){throw new Error(j.error||j.message)}setTimeout(pollJob,1500)}catch(e){$('collectBtn').disabled=false;$('statusText').textContent='Erro: '+e.message;alert(e.message)}}
 async function showHistory(id){const r=state.rows.find(x=>x.ConversationId===id);$('modalTitle').textContent='Histórico • '+(r?.Nome||id);$('modalSub').textContent=`${r?.Telefone||''} • ${r?.Origem||''} • ${r?.OrigemDetalhada||''}`;$('modalBody').innerHTML='<div class="muted">Carregando...</div>';$('modal').classList.add('open');try{const d=await api('/api/history/'+encodeURIComponent(id));if(!d.messages.length){$('modalBody').innerHTML='<div class="muted">Nenhuma mensagem retornada.</div>';return}$('modalBody').innerHTML=`<div class="table-wrap"><table style="min-width:1100px"><thead><tr><th>Horário</th><th>Direção</th><th>Status</th><th>Mensagem</th><th>Erro</th><th>Atendente</th></tr></thead><tbody>${d.messages.map(m=>`<tr><td>${esc(fmtDate(m.createdAt))}</td><td>${esc(m.direction)}</td><td>${esc(m.status)}</td><td style="white-space:pre-wrap">${esc(m.body)}</td><td>${esc([m.errorCode,m.errorMessage].filter(Boolean).join(' - '))}</td><td>${esc(m.attendants)}</td></tr>`).join('')}</tbody></table></div>`}catch(e){$('modalBody').innerHTML='<div style="color:#ff8b91">'+esc(e.message)+'</div>'}}
 async function exportXlsx(rows,filename,sheetName){const r=await fetch('/api/export/xlsx',{method:'POST',headers:headers(),body:JSON.stringify({rows,filename,sheetName})});if(!r.ok){let x={};try{x=await r.json()}catch{}throw new Error(x.error||`HTTP ${r.status}`)}const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+
+async function downloadV11(){
+  if(!state.jobId)return alert('Execute a V11 primeiro.');
+  const r=await fetch('/api/v11/export',{method:'POST',headers:headers(),body:JSON.stringify({jobId:state.jobId})});
+  if(!r.ok){let x={};try{x=await r.json()}catch{}throw new Error(x.error||`HTTP ${r.status}`)}
+  const blob=await r.blob(),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='datacrazy_V11_COLETA_E_EXCEL_AUTOMATICO.xlsx';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
 async function roundRobin(){const rows=state.rows.filter(r=>state.selected.has(r.ConversationId));if(!rows.length)return;const startIndex=Number(localStorage.getItem('lopexRodizioIndex')||0);try{const d=await api('/api/round-robin',{method:'POST',body:JSON.stringify({rows,startIndex})});localStorage.setItem('lopexRodizioIndex',String(d.nextIndex));$('modalTitle').textContent='Plano do rodízio';$('modalSub').textContent=`${d.plan.length} conversas • próxima rodada: ${d.nextConsultant} • transferência automática ainda não executada`;$('modalBody').innerHTML=`<div style="display:flex;gap:8px;margin-bottom:12px"><button id="planXlsx" class="green">Baixar plano Excel</button></div><div class="source-list" style="margin-bottom:12px">${d.summary.map(s=>`<span class="pill">${esc(s.Consultor)}: <b>${s.Quantidade}</b></span>`).join('')}</div><div class="table-wrap"><table style="min-width:1200px"><thead><tr><th>#</th><th>Nome</th><th>Telefone</th><th>Origem</th><th>Regional</th><th>Consultor destino</th></tr></thead><tbody>${d.plan.map(p=>`<tr><td>${p.Ordem}</td><td>${esc(p.Nome)}</td><td>${esc(p.Telefone)}</td><td>${esc(p.Origem)}</td><td>${esc(p.Regional)}</td><td><strong>${esc(p.ConsultorDestino)}</strong></td></tr>`).join('')}</tbody></table></div>`;$('modal').classList.add('open');setTimeout(()=>{$('planXlsx').onclick=()=>exportXlsx(d.plan,'datacrazy_RODIZIO_VALIDADO_COM_ORIGEM.xlsx','RODIZIO')},0)}catch(e){alert(e.message)}}
-$('collectBtn').onclick=startCollect;$('clearBtn').onclick=()=>{state.rows=[];state.filtered=[];state.selected.clear();updateKpis();render();$('statusCard').style.display='none'};$('search').oninput=render;$('originFilter').onchange=render;$('regionalFilter').onchange=render;$('markAll').onclick=()=>{state.filtered.forEach(r=>state.selected.add(r.ConversationId));render()};$('unmarkAll').onclick=()=>{state.filtered.forEach(r=>state.selected.delete(r.ConversationId));render()};$('xlsxBtn').onclick=()=>exportXlsx(state.rows.map(r=>({...r,ValidadoParaRodizio:state.selected.has(r.ConversationId)?'SIM':'NAO'})),'datacrazy_V11_COM_ORIGEM.xlsx','LEADS COM ORIGEM').catch(e=>alert(e.message));$('roundBtn').onclick=roundRobin;$('modalClose').onclick=()=>$('modal').classList.remove('open');$('modal').onclick=e=>{if(e.target===$('modal'))$('modal').classList.remove('open')};init().catch(e=>alert('Erro ao carregar painel: '+e.message));
+$('collectBtn').onclick=startCollect;$('v11XlsxBtn').onclick=()=>downloadV11().catch(e=>alert(e.message));$('clearBtn').onclick=()=>{state.rows=[];state.filtered=[];state.selected.clear();state.jobId=null;updateKpis();render();$('statusCard').style.display='none'};$('search').oninput=render;$('originFilter').onchange=render;$('regionalFilter').onchange=render;$('markAll').onclick=()=>{state.filtered.forEach(r=>state.selected.add(r.ConversationId));render()};$('unmarkAll').onclick=()=>{state.filtered.forEach(r=>state.selected.delete(r.ConversationId));render()};$('xlsxBtn').onclick=()=>exportXlsx(state.rows.map(r=>({...r,ValidadoParaRodizio:state.selected.has(r.ConversationId)?'SIM':'NAO'})),'datacrazy_V11_COM_ORIGEM.xlsx','LEADS COM ORIGEM').catch(e=>alert(e.message));$('roundBtn').onclick=roundRobin;$('modalClose').onclick=()=>$('modal').classList.remove('open');$('modal').onclick=e=>{if(e.target===$('modal'))$('modal').classList.remove('open')};init().catch(e=>alert('Erro ao carregar painel: '+e.message));
 </script>
 </body></html>

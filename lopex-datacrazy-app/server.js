@@ -525,6 +525,29 @@ app.post('/api/round-robin', async (req, res) => {
   }
 });
 
+
+
+function appendSheetFromRows(wb, name, rows) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const ws = XLSX.utils.json_to_sheet(safeRows);
+  const headers = safeRows.length ? Object.keys(safeRows[0]) : [];
+  ws['!cols'] = headers.map(h => ({ wch: Math.min(42, Math.max(12, String(h).length + 2)) }));
+  XLSX.utils.book_append_sheet(wb, ws, String(name || 'PLANILHA').slice(0, 31));
+}
+
+function uniqueNoAttendantRows(rows) {
+  const seen = new Set();
+  const out = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const phone = normalizePhone(row?.Telefone || '');
+    const key = phone ? `PHONE:${phone}` : `CONV:${row?.ConversationId || ''}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
+
 app.post('/api/export/xlsx', (req, res) => {
   try {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
@@ -536,6 +559,58 @@ app.post('/api/export/xlsx', (req, res) => {
     ws['!cols'] = headers.map(h => ({ wch: Math.min(42, Math.max(12, String(h).length + 2)) }));
     XLSX.utils.book_append_sheet(wb, ws, title || 'LEADS');
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+app.post('/api/v11/export', (req, res) => {
+  try {
+    const jobId = String(req.body?.jobId || '').trim();
+    const job = jobs.get(jobId);
+    if (!job) return res.status(404).json({ error: 'Coleta V11 não encontrada. Execute a V11 novamente.' });
+    if (job.status !== 'done' || !job.result) return res.status(409).json({ error: 'A coleta V11 ainda não terminou.' });
+
+    const allNoAttendant = Array.isArray(job.result.rows) ? job.result.rows : [];
+    const semAtendente = allNoAttendant.filter(r => String(r?.Situacao || '').toLowerCase() === 'sem atendente');
+    const failedSem = allNoAttendant.filter(r => String(r?.Situacao || '').toLowerCase().includes('failed'));
+    const failedCom = Array.isArray(job.result.failedWithAttendant) ? job.result.failedWithAttendant : [];
+    const uniqueRows = uniqueNoAttendantRows(allNoAttendant);
+    const s = job.result.summary || {};
+
+    const summaryRows = [
+      { Indicador: 'Sem atendente (não failed)', Valor: s.semAtendenteNaoFailed || 0 },
+      { Indicador: 'FAILED + sem atendente', Valor: s.failedSemAtendente || 0 },
+      { Indicador: 'TOTAL sem atendente', Valor: s.totalSemAtendente || allNoAttendant.length },
+      { Indicador: 'Leads únicos sem atendente', Valor: uniqueRows.length },
+      { Indicador: 'FAILED + com atendente', Valor: s.failedComAtendente || 0 },
+      { Indicador: 'TOTAL FAILED', Valor: s.totalFailed || 0 },
+      { Indicador: 'Origem confirmada', Valor: s.origemConfirmada || 0 },
+      { Indicador: 'Conflito de origem', Valor: s.origemConflito || 0 },
+      { Indicador: 'Origem não localizada', Valor: s.origemNaoLocalizada || 0 },
+      { Indicador: 'Take da paginação', Valor: s.take || '' },
+      { Indicador: 'Requisições API', Valor: s.requests || 0 },
+      { Indicador: 'HTTP 429', Valor: s.rateLimits || 0 },
+      { Indicador: 'Delay final (ms)', Valor: s.delayFinalMs || 0 },
+      { Indicador: 'Coletado em', Valor: job.result.collectedAt || '' }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    appendSheetFromRows(wb, 'RESUMO', summaryRows);
+    appendSheetFromRows(wb, 'TODOS SEM ATENDENTE', allNoAttendant);
+    appendSheetFromRows(wb, 'SEM ATENDENTE', semAtendente);
+    appendSheetFromRows(wb, 'FAILED SEM ATENDENTE', failedSem);
+    appendSheetFromRows(wb, 'FAILED COM ATENDENTE', failedCom);
+    appendSheetFromRows(wb, 'LEADS UNICOS S ATENDENTE', uniqueRows);
+    appendSheetFromRows(wb, 'FONTES ORIGEM', job.result.sourceStatus || []);
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const filename = 'datacrazy_V11_COLETA_E_EXCEL_AUTOMATICO.xlsx';
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
