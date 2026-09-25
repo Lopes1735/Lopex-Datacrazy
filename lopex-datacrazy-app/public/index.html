@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lopes • DataCrazy</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#111b2e;--panel2:#17233a;--line:#273553;--text:#edf3ff;--muted:#94a3b8;--blue:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--cyan:#06b6d4}
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(145deg,#07101f,#0c1424 55%,#0b1220);color:var(--text);font:14px/1.45 Inter,Segoe UI,Arial,sans-serif}
+    .wrap{max-width:1660px;margin:auto;padding:22px}.top{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+    h1{margin:0;font-size:26px}.sub{color:var(--muted);margin-top:3px}.card{background:rgba(17,27,46,.94);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,.22)}
+    .auth{padding:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.auth input,.toolbar input,.toolbar select{background:#0c1628;border:1px solid var(--line);color:var(--text);border-radius:9px;padding:10px 12px;outline:none}.auth input{min-width:245px}
+    button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;color:white;background:var(--blue)} button.secondary{background:#334155} button.green{background:#168a45} button.yellow{background:#b77908} button.red{background:#b72d35} button:disabled{opacity:.5;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:16px 0}.kpi{padding:15px}.kpi b{font-size:25px;display:block}.kpi span{color:var(--muted);font-size:12px}.kpi.ok b{color:#55d985}.kpi.warn b{color:#f8c24e}.kpi.bad b{color:#ff6b72}
+    .status{padding:12px 15px;margin:12px 0;display:flex;align-items:center;gap:12px}.bar{height:8px;background:#0a1323;border-radius:999px;overflow:hidden;flex:1}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));width:0%}
+    .toolbar{padding:12px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}.toolbar input{min-width:260px}.toolbar .grow{flex:1}
+    .table-wrap{overflow:auto;max-height:610px;border-radius:0 0 16px 16px}table{border-collapse:separate;border-spacing:0;width:100%;min-width:1550px;background:#0e182a}th{position:sticky;top:0;z-index:2;background:#16243c;color:#d9e5f7;text-align:left;padding:10px;border-bottom:1px solid var(--line);font-size:12px;white-space:nowrap}td{padding:9px 10px;border-bottom:1px solid #1d2b45;vertical-align:top}tr:hover td{background:#13213a}.muted{color:var(--muted)}.pill{display:inline-block;border:1px solid var(--line);background:#101b2e;border-radius:999px;padding:3px 8px;font-size:11px;white-space:nowrap}.pill.meta{border-color:#3357a7;color:#9bbcff}.pill.google{border-color:#527c4b;color:#9be38d}.pill.ok{border-color:#24643d;color:#78dc9e}.pill.conflict{border-color:#946c26;color:#ffd576}.pill.no{border-color:#6c3941;color:#ff9aa1}
+    .actions{display:flex;gap:6px}.actions button{padding:6px 9px;font-size:11px}.footer-note{color:var(--muted);padding:12px 3px}.modal{position:fixed;inset:0;background:rgba(2,6,15,.78);display:none;align-items:center;justify-content:center;padding:18px;z-index:20}.modal.open{display:flex}.modal-box{width:min(1400px,96vw);max-height:92vh;overflow:auto;background:#101a2c;border:1px solid var(--line);border-radius:16px}.modal-head{position:sticky;top:0;background:#101a2c;padding:15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:center;z-index:3}.modal-body{padding:15px}.source-list{display:flex;gap:8px;flex-wrap:wrap}.small{font-size:12px}.right{margin-left:auto}@media(max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><h1>Lopes • DataCrazy</h1><div class="sub">Coleta • origem Meta/Google • histórico • validação • rodízio</div></div><div id="serverBadge" class="pill">carregando configuração...</div></div>
+
+  <div class="card auth">
+    <input id="appPassword" type="password" placeholder="Senha do painel (se configurada)" />
+    <input id="token" type="password" placeholder="Chave API DataCrazy" />
+    <button id="collectBtn">COLETAR AGORA</button>
+    <button class="secondary" id="clearBtn">Limpar tela</button>
+    <span class="muted small">A chave digitada fica apenas nesta aba e é enviada por HTTPS ao servidor.</span>
+  </div>
+
+  <div class="grid">
+    <div class="card kpi"><b id="kTotal">0</b><span>Sem atendente</span></div>
+    <div class="card kpi"><b id="kNormal">0</b><span>Sem atendente (não failed)</span></div>
+    <div class="card kpi bad"><b id="kFailed">0</b><span>FAILED sem atendente</span></div>
+    <div class="card kpi ok"><b id="kOrigin">0</b><span>Origem confirmada</span></div>
+    <div class="card kpi warn"><b id="kConflict">0</b><span>Conflito de origem</span></div>
+    <div class="card kpi"><b id="kSelected">0</b><span>Marcados para rodízio</span></div>
+  </div>
+
+  <div id="statusCard" class="card status" style="display:none"><strong id="statusText">Preparando...</strong><div class="bar"><i id="progress"></i></div><span id="progressText">0%</span></div>
+
+  <div class="card">
+    <div class="toolbar">
+      <input id="search" placeholder="Buscar nome, telefone, origem, regional, status..." />
+      <select id="originFilter"><option value="">Todas as origens</option><option>Meta Ads</option><option>Google Ads</option><option>NÃO LOCALIZADO</option><option>CONFLITO</option></select>
+      <select id="regionalFilter"><option value="">Todas as regionais</option></select>
+      <button class="secondary" id="markAll">Marcar visíveis</button>
+      <button class="secondary" id="unmarkAll">Desmarcar visíveis</button>
+      <span class="grow"></span>
+      <button class="green" id="xlsxBtn" disabled>BAIXAR EXCEL</button>
+      <button class="yellow" id="roundBtn" disabled>GERAR RODÍZIO</button>
+    </div>
+    <div class="table-wrap"><table><thead><tr>
+      <th>Rodízio</th><th>Nome</th><th>Telefone</th><th>Origem</th><th>Fonte/Campanha</th><th>Regional</th><th>Validação origem</th><th>Status</th><th>Situação</th><th>Departamento</th><th>Atualizado</th><th>Ações</th>
+    </tr></thead><tbody id="tbody"><tr><td colspan="12" class="muted">Clique em COLETAR AGORA.</td></tr></tbody></table></div>
+  </div>
+  <div id="sources" class="footer-note"></div>
+</div>
+
+<div class="modal" id="modal"><div class="modal-box"><div class="modal-head"><div><strong id="modalTitle">Histórico</strong><div id="modalSub" class="muted small"></div></div><button class="secondary" id="modalClose">Fechar</button></div><div class="modal-body" id="modalBody"></div></div></div>
+
+<script>
+const state={rows:[],filtered:[],selected:new Set(),config:null,token:'',password:'',jobId:null};
+const $=id=>document.getElementById(id);
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function headers(extra={}){const h={'Content-Type':'application/json',...extra}; if(state.token)h['x-datacrazy-token']=state.token;if(state.password)h['x-app-password']=state.password;return h}
+async function api(url,opt={}){const r=await fetch(url,{...opt,headers:headers(opt.headers||{})});let data;try{data=await r.json()}catch{data={error:await r.text()}}if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);return data}
+function fmtDate(v){if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toLocaleString('pt-BR')}
+function pillOrigin(v){let c='';if(v==='Meta Ads')c='meta';else if(v==='Google Ads')c='google';else if(v==='CONFLITO')c='conflict';else if(v==='NÃO LOCALIZADO')c='no';return `<span class="pill ${c}">${esc(v||'')}</span>`}
+function pillVal(v){let c=v==='CONFIRMADA'?'ok':(String(v).startsWith('REVISAR')?'conflict':'no');return `<span class="pill ${c}">${esc(v||'')}</span>`}
+function render(){
+  const q=$('search').value.trim().toLowerCase(),of=$('originFilter').value,rf=$('regionalFilter').value;
+  state.filtered=state.rows.filter(r=>{const hay=[r.Nome,r.Telefone,r.Origem,r.OrigemDetalhada,r.Regional,r.Status,r.Situacao,r.Departamento].join(' ').toLowerCase();return(!q||hay.includes(q))&&(!of||r.Origem===of)&&(!rf||r.Regional===rf)});
+  const tb=$('tbody');if(!state.filtered.length){tb.innerHTML='<tr><td colspan="12" class="muted">Nenhuma conversa encontrada.</td></tr>';updateSelected();return}
+  tb.innerHTML=state.filtered.map((r,i)=>`<tr><td><input type="checkbox" data-id="${esc(r.ConversationId)}" ${state.selected.has(r.ConversationId)?'checked':''}></td><td><strong>${esc(r.Nome)}</strong></td><td>${esc(r.Telefone)}</td><td>${pillOrigin(r.Origem)}</td><td>${esc(r.OrigemDetalhada)}</td><td>${esc(r.Regional)}</td><td>${pillVal(r.ValidacaoOrigem)}</td><td><span class="pill">${esc(r.Status)}</span></td><td>${esc(r.Situacao)}</td><td>${esc(r.Departamento)}</td><td>${esc(fmtDate(r.AtualizadoEm))}</td><td><div class="actions"><button data-history="${esc(r.ConversationId)}">Histórico</button>${r.FonteOrigem&&!String(r.FonteOrigem).includes(' | ')?`<button class="secondary" data-source="${esc(r.FonteOrigem)}">Fonte</button>`:''}<button class="secondary" data-wa="${esc(r.Telefone)}">WhatsApp</button></div></td></tr>`).join('');
+  tb.querySelectorAll('input[type=checkbox]').forEach(x=>x.onchange=()=>{x.checked?state.selected.add(x.dataset.id):state.selected.delete(x.dataset.id);updateSelected()});
+  tb.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>showHistory(b.dataset.history));
+  tb.querySelectorAll('[data-source]').forEach(b=>b.onclick=()=>window.open(b.dataset.source,'_blank'));
+  tb.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>window.open('https://wa.me/'+String(b.dataset.wa).replace(/\D/g,''),'_blank'));
+  updateSelected();
+}
+function updateSelected(){$('kSelected').textContent=state.selected.size;$('roundBtn').disabled=!state.selected.size;$('xlsxBtn').disabled=!state.rows.length}
+function updateKpis(s={}){$('kTotal').textContent=s.totalSemAtendente||0;$('kNormal').textContent=s.semAtendenteNaoFailed||0;$('kFailed').textContent=s.failedSemAtendente||0;$('kOrigin').textContent=s.origemConfirmada||0;$('kConflict').textContent=s.origemConflito||0}
+async function init(){state.config=await fetch('/api/config').then(r=>r.json());$('serverBadge').textContent=`Painel ${state.config.appPasswordConfigured?'protegido':'sem senha'} • Token ${state.config.dataCrazyTokenConfigured?'no servidor':'manual'}`;if(state.config.dataCrazyTokenConfigured){$('token').placeholder='Token já configurado no servidor (opcional)'}if(!state.config.appPasswordConfigured)$('appPassword').style.display='none'}
+async function startCollect(){state.token=$('token').value.trim();state.password=$('appPassword').value; if(!state.config.dataCrazyTokenConfigured&&!state.token)return alert('Cole a chave API do DataCrazy.');$('collectBtn').disabled=true;$('statusCard').style.display='flex';$('statusText').textContent='Iniciando coleta...';$('progress').style.width='2%';$('progressText').textContent='2%';try{const r=await api('/api/collect/start',{method:'POST',body:'{}'});state.jobId=r.jobId;pollJob()}catch(e){$('collectBtn').disabled=false;alert(e.message)}}
+async function pollJob(){try{const j=await api('/api/jobs/'+state.jobId);$('statusText').textContent=j.message||j.phase;$('progress').style.width=(j.progress||0)+'%';$('progressText').textContent=(j.progress||0)+'%';if(j.status==='done'){state.rows=j.result.rows||[];state.selected=new Set(state.rows.map(r=>r.ConversationId));updateKpis(j.result.summary);const regs=[...new Set(state.rows.map(r=>r.Regional).filter(Boolean))].sort();$('regionalFilter').innerHTML='<option value="">Todas as regionais</option>'+regs.map(x=>`<option>${esc(x)}</option>`).join('');$('sources').innerHTML='<strong>Fontes de origem:</strong> <span class="source-list">'+(j.result.sourceStatus||[]).map(s=>`<span class="pill ${s.status==='OK'?'ok':'no'}">${esc(s.fonte)}: ${esc(s.status)}${s.telefones?` (${s.telefones})`:''}</span>`).join('')+'</span>';render();$('collectBtn').disabled=false;return}if(j.status==='error'){throw new Error(j.error||j.message)}setTimeout(pollJob,1500)}catch(e){$('collectBtn').disabled=false;$('statusText').textContent='Erro: '+e.message;alert(e.message)}}
+async function showHistory(id){const r=state.rows.find(x=>x.ConversationId===id);$('modalTitle').textContent='Histórico • '+(r?.Nome||id);$('modalSub').textContent=`${r?.Telefone||''} • ${r?.Origem||''} • ${r?.OrigemDetalhada||''}`;$('modalBody').innerHTML='<div class="muted">Carregando...</div>';$('modal').classList.add('open');try{const d=await api('/api/history/'+encodeURIComponent(id));if(!d.messages.length){$('modalBody').innerHTML='<div class="muted">Nenhuma mensagem retornada.</div>';return}$('modalBody').innerHTML=`<div class="table-wrap"><table style="min-width:1100px"><thead><tr><th>Horário</th><th>Direção</th><th>Status</th><th>Mensagem</th><th>Erro</th><th>Atendente</th></tr></thead><tbody>${d.messages.map(m=>`<tr><td>${esc(fmtDate(m.createdAt))}</td><td>${esc(m.direction)}</td><td>${esc(m.status)}</td><td style="white-space:pre-wrap">${esc(m.body)}</td><td>${esc([m.errorCode,m.errorMessage].filter(Boolean).join(' - '))}</td><td>${esc(m.attendants)}</td></tr>`).join('')}</tbody></table></div>`}catch(e){$('modalBody').innerHTML='<div style="color:#ff8b91">'+esc(e.message)+'</div>'}}
+async function exportXlsx(rows,filename,sheetName){const r=await fetch('/api/export/xlsx',{method:'POST',headers:headers(),body:JSON.stringify({rows,filename,sheetName})});if(!r.ok){let x={};try{x=await r.json()}catch{}throw new Error(x.error||`HTTP ${r.status}`)}const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+async function roundRobin(){const rows=state.rows.filter(r=>state.selected.has(r.ConversationId));if(!rows.length)return;const startIndex=Number(localStorage.getItem('lopexRodizioIndex')||0);try{const d=await api('/api/round-robin',{method:'POST',body:JSON.stringify({rows,startIndex})});localStorage.setItem('lopexRodizioIndex',String(d.nextIndex));$('modalTitle').textContent='Plano do rodízio';$('modalSub').textContent=`${d.plan.length} conversas • próxima rodada: ${d.nextConsultant} • transferência automática ainda não executada`;$('modalBody').innerHTML=`<div style="display:flex;gap:8px;margin-bottom:12px"><button id="planXlsx" class="green">Baixar plano Excel</button></div><div class="source-list" style="margin-bottom:12px">${d.summary.map(s=>`<span class="pill">${esc(s.Consultor)}: <b>${s.Quantidade}</b></span>`).join('')}</div><div class="table-wrap"><table style="min-width:1200px"><thead><tr><th>#</th><th>Nome</th><th>Telefone</th><th>Origem</th><th>Regional</th><th>Consultor destino</th></tr></thead><tbody>${d.plan.map(p=>`<tr><td>${p.Ordem}</td><td>${esc(p.Nome)}</td><td>${esc(p.Telefone)}</td><td>${esc(p.Origem)}</td><td>${esc(p.Regional)}</td><td><strong>${esc(p.ConsultorDestino)}</strong></td></tr>`).join('')}</tbody></table></div>`;$('modal').classList.add('open');setTimeout(()=>{$('planXlsx').onclick=()=>exportXlsx(d.plan,'datacrazy_RODIZIO_VALIDADO_COM_ORIGEM.xlsx','RODIZIO')},0)}catch(e){alert(e.message)}}
+$('collectBtn').onclick=startCollect;$('clearBtn').onclick=()=>{state.rows=[];state.filtered=[];state.selected.clear();updateKpis();render();$('statusCard').style.display='none'};$('search').oninput=render;$('originFilter').onchange=render;$('regionalFilter').onchange=render;$('markAll').onclick=()=>{state.filtered.forEach(r=>state.selected.add(r.ConversationId));render()};$('unmarkAll').onclick=()=>{state.filtered.forEach(r=>state.selected.delete(r.ConversationId));render()};$('xlsxBtn').onclick=()=>exportXlsx(state.rows.map(r=>({...r,ValidadoParaRodizio:state.selected.has(r.ConversationId)?'SIM':'NAO'})),'datacrazy_V11_COM_ORIGEM.xlsx','LEADS COM ORIGEM').catch(e=>alert(e.message));$('roundBtn').onclick=roundRobin;$('modalClose').onclick=()=>$('modal').classList.remove('open');$('modal').onclick=e=>{if(e.target===$('modal'))$('modal').classList.remove('open')};init().catch(e=>alert('Erro ao carregar painel: '+e.message));
+</script>
+</body></html>
